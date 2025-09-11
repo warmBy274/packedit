@@ -106,10 +106,15 @@ impl Ipv4Option {
     }
     /// Recalculates `length` field of option base on data len
     pub fn recalculate_length(&mut self) -> () {
-        self.length = self.data.len() as u8;
+        self.length = self.data.len() as u8 + 2;
     }
 }
 
+/// Struct for oridinary IPv4 Packet
+/// You can construct it from scratch with `Ipv4Packet::new()` and consistently editing
+/// Or construct from existing packet bytes with `Ipv4Packet::from_bytes()`
+/// All `u16` fields of this packet **are not in big-endian order**
+/// All `u16` fields of this packet **are in native order**
 pub struct Ipv4Packet {
     /// Ipv4 Header length of packet in bytes
     pub header_len: u8,
@@ -167,7 +172,7 @@ impl Ipv4Packet {
         }
     }
     /// Constructs `Ipv4Packet` from existing packet bytes
-    pub fn from_bytes(bytes: &[u8]) -> Self {
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
         if (bytes[0] >> 4) != 4 {
             panic!("Its not an Ipv4 packet!");
         }
@@ -250,8 +255,8 @@ impl Ipv4Packet {
     /// Gives a next level packet, i.e. if protocol is TCP -> gives TcpPacket, if protocol is UDP -> gives UdpPacket, etc.
     pub fn get_next_level_packet(&self) -> Ipv4NextLevelPacket {
         match self.protocol {
-            6 => Ipv4NextLevelPacket::Tcp(TcpPacket::from_bytes(&self.payload.clone())),
-            17 => Ipv4NextLevelPacket::Udp(UdpPacket::from_bytes(&self.payload.clone())),
+            6 => Ipv4NextLevelPacket::Tcp(TcpPacket::from_bytes(self.payload.clone())),
+            17 => Ipv4NextLevelPacket::Udp(UdpPacket::from_bytes(self.payload.clone())),
             _ => unimplemented!()
         }
     }

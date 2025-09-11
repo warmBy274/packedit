@@ -30,7 +30,7 @@ impl UdpPacket {
         }
     }
     /// Constructs `UdpPacket` from existing packet bytes
-    pub fn from_bytes(bytes: &[u8]) -> Self {
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
         Self {
             source: u16::from_be_bytes([bytes[0], bytes[1]]),
             destination: u16::from_be_bytes([bytes[2], bytes[3]]),

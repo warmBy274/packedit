@@ -26,7 +26,7 @@ impl TcpOption {
     /// Constructs `TcpOption` from bytes
     /// Note that this method is not detecting where option starts and where ends
     /// This method **is not parsing options**, this method **exclusively constructs an one option**
-    pub fn from_bytes(bytes: &[u8]) -> Self {
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
         Self {
             kind: bytes[0],
             length: bytes[1],
@@ -43,7 +43,7 @@ impl TcpOption {
     }
     /// Recalculates `length` field of option base on data len
     pub fn recalculate_length(&mut self) -> () {
-        self.length = self.data.len() as u8;
+        self.length = self.data.len() as u8 + 2;
     }
 }
 
@@ -153,7 +153,7 @@ impl TcpPacket {
         }
     }
     /// Constructs `TcpPacket` from existing packet bytes
-    pub fn from_bytes(bytes: &[u8]) -> Self {
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
         if bytes.len() < 20 {
             panic!("Length of bytes is less than 20!");
         }
@@ -175,7 +175,7 @@ impl TcpPacket {
                     i += 1;
                     continue;
                 }
-                packet.options.push(TcpOption::from_bytes(&bytes[i..i + 2 + bytes[i + 1] as usize]));
+                packet.options.push(TcpOption::from_bytes(bytes[i..i + 2 + bytes[i + 1] as usize].to_vec()));
                 i += bytes[i + 1] as usize + 2;
             }
         }
