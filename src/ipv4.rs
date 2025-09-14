@@ -203,7 +203,7 @@ impl Ipv4Packet {
                     i += 1;
                     continue;
                 }
-                packet.options.push(Ipv4Option::from_bytes(&bytes[i..i + 2 + bytes[i + 1] as usize]));
+                packet.options.push(Ipv4Option::from_bytes(&bytes[i..i + bytes[i + 1] as usize]));
                 i += bytes[i + 1] as usize;
             }
         }

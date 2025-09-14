@@ -178,7 +178,7 @@ impl TcpPacket {
                     i += 1;
                     continue;
                 }
-                packet.options.push(TcpOption::from_bytes(bytes[i..i + 2 + bytes[i + 1] as usize].to_vec()));
+                packet.options.push(TcpOption::from_bytes(bytes[i..i + bytes[i + 1] as usize].to_vec()));
                 i += bytes[i + 1] as usize;
             }
         }
