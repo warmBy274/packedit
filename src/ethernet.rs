@@ -1,5 +1,6 @@
 /// Media Access Control Address
 /// Contains 6 bytes
+#[derive(Debug, Clone)]
 pub struct MacAddress {
     /// Mac Address Data Bytes
     pub bytes: [u8; 6]
@@ -31,6 +32,7 @@ impl MacAddress {
 /// Struct for oridinary Ethernet Frame
 /// You can construct it from scratch with `EthernetPacket::new()` and consistently editing
 /// Or construct from existing packet bytes with `EthernetPacket::from_bytes()`
+#[derive(Debug, Clone)]
 pub struct EthernetPacket {
     pub destination: MacAddress,
     pub source: MacAddress,

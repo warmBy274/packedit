@@ -13,6 +13,7 @@ pub enum Ipv4NextLevelPacket {
 
 /// IPv4 Option Class
 /// Takes up 2nd and 3rd bits of an IPv4 Option
+#[derive(Debug, Clone)]
 pub enum Ipv4OptionClass {
     /// 0b00
     Control,
@@ -55,6 +56,7 @@ impl Ipv4OptionClass {
 ///   3. 5 bits Option Type Number
 ///   4. 1 byte length in bytes
 ///   5. N bytes data
+#[derive(Debug, Clone)]
 pub struct Ipv4Option {
     /// `copy` flag for IPv4 Option
     pub copy: bool,
@@ -115,6 +117,7 @@ impl Ipv4Option {
 /// Or construct from existing packet bytes with `Ipv4Packet::from_bytes()`
 /// All `u16` fields of this packet **are not in big-endian order**
 /// All `u16` fields of this packet **are in native order**
+#[derive(Debug, Clone)]
 pub struct Ipv4Packet {
     /// Ipv4 Header length of packet in bytes
     pub header_len: u8,
@@ -201,7 +204,7 @@ impl Ipv4Packet {
                     continue;
                 }
                 packet.options.push(Ipv4Option::from_bytes(&bytes[i..i + 2 + bytes[i + 1] as usize]));
-                i += bytes[i + 1] as usize + 2;
+                i += bytes[i + 1] as usize;
             }
         }
         packet.payload = bytes[packet.header_len as usize..].to_vec();
@@ -240,6 +243,14 @@ impl Ipv4Packet {
         let mut packet = self.header_to_bytes();
         packet.append(&mut self.payload.clone());
         packet
+    }
+    /// Recalculates all fields
+    pub fn recalculate_all(&mut self) -> () {
+        for option in self.options.iter_mut() {
+            option.recalculate_length();
+        }
+        self.recalculate_lengths();
+        self.recalculate_checksum();
     }
     /// Recalculates `header_len` and `total_len` fields in `Ipv4Packet`
     pub fn recalculate_lengths(&mut self) -> () {

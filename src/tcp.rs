@@ -6,6 +6,7 @@ use crate::util::checksum;
 ///   1. 1 byte Kind
 ///   2. 1 byte Length in bytes
 ///   3. N bytes data
+#[derive(Debug, Clone)]
 pub struct TcpOption {
     /// TCP Option *'type'*
     pub kind: u8,
@@ -49,6 +50,7 @@ impl TcpOption {
 
 /// Struct for TCP Packet Flags in normal order for `TcpPacket`
 /// Note that normal TCP Packet Flags order are: `nonce_sum`, `cwr`, `ece`, `urg`, `ack`, `psh`, `rst`, `syn` and `fin`
+#[derive(Debug, Clone)]
 pub struct TcpFlags {
     pub nonce_sum: bool,
     pub cwr: bool,
@@ -110,6 +112,7 @@ impl TcpFlags {
 /// Or construct from existing packet bytes with `TcpPacket::from_bytes()`
 /// All `u16` fields of this packet **are not in big-endian order**
 /// All `u16` fields of this packet **are in native order**
+#[derive(Debug, Clone)]
 pub struct TcpPacket {
     /// Source Port in native bytes order
     pub source: u16,
@@ -176,7 +179,7 @@ impl TcpPacket {
                     continue;
                 }
                 packet.options.push(TcpOption::from_bytes(bytes[i..i + 2 + bytes[i + 1] as usize].to_vec()));
-                i += bytes[i + 1] as usize + 2;
+                i += bytes[i + 1] as usize;
             }
         }
         packet.payload = bytes[packet.data_offset as usize..].to_vec();
@@ -211,6 +214,14 @@ impl TcpPacket {
         let mut packet = self.header_to_bytes();
         packet.append(&mut self.payload.clone());
         packet
+    }
+    /// Recalculates all fields
+    pub fn recalculate_all(&mut self, source_ip: Ipv4Addr, destination_ip: Ipv4Addr) -> () {
+        for option in self.options.iter_mut() {
+            option.recalculate_length();
+        }
+        self.recalculate_data_offset();
+        self.recalculate_checksum(source_ip, destination_ip);
     }
     /// Recalculates `data_offset` field in `TcpPacket`
     pub fn recalculate_data_offset(&mut self) -> () {

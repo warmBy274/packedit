@@ -6,6 +6,7 @@ use crate::util::checksum;
 /// Or construct from existing packet bytes with `UdpPacket::from_bytes()`
 /// All `u16` fields of this packet **are not in big-endian order**
 /// All `u16` fields of this packet **are in native order**
+#[derive(Debug, Clone)]
 pub struct UdpPacket {
     /// Source Port in native bytes order
     pub source: u16,
@@ -53,6 +54,11 @@ impl UdpPacket {
         let mut packet = self.header_to_bytes();
         packet.append(&mut self.payload.clone());
         packet
+    }
+    /// Recalculates all fields
+    pub fn recalculate_all(&mut self, source_ip: Ipv4Addr, destination_ip: Ipv4Addr) -> () {
+        self.recalculate_length();
+        self.recalculate_checksum(source_ip, destination_ip);
     }
     /// Recalculates `length` field in `UdpPacket`
     pub fn recalculate_length(&mut self) -> () {
