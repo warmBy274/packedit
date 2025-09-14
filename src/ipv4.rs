@@ -8,7 +8,8 @@ use crate::{
 /// Next Level Packet from IPv4 Packet payload
 pub enum Ipv4NextLevelPacket {
     Tcp(TcpPacket),
-    Udp(UdpPacket)
+    Udp(UdpPacket),
+    Unimplemented(Vec<u8>)
 }
 
 /// IPv4 Option Class
@@ -268,7 +269,7 @@ impl Ipv4Packet {
         match self.protocol {
             6 => Ipv4NextLevelPacket::Tcp(TcpPacket::from_bytes(self.payload.clone())),
             17 => Ipv4NextLevelPacket::Udp(UdpPacket::from_bytes(self.payload.clone())),
-            _ => unimplemented!()
+            _ => Ipv4NextLevelPacket::Unimplemented(self.payload.clone())
         }
     }
 }
