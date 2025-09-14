@@ -227,7 +227,7 @@ impl Ipv4Packet {
         packet[9] = self.protocol;
         packet[10..=11].copy_from_slice(&self.checksum.to_be_bytes());
         packet[12..=15].copy_from_slice(&self.source.octets());
-        packet[16..19].copy_from_slice(&self.destination.octets());
+        packet[16..=19].copy_from_slice(&self.destination.octets());
         for option in self.options.iter() {
             packet.append(&mut option.to_bytes());
         }
