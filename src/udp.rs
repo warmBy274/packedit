@@ -72,7 +72,7 @@ impl UdpPacket {
         pseudo_header.append(&mut source_ip.octets().to_vec());
         pseudo_header.append(&mut destination_ip.octets().to_vec());
         pseudo_header.push(0);
-        pseudo_header.push(6);
+        pseudo_header.push(17);
         pseudo_header.append(&mut (packet.len() as u16).to_be_bytes().to_vec());
         pseudo_header.append(&mut packet);
         pseudo_header[18] = 0;
