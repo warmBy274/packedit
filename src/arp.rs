@@ -1,6 +1,4 @@
 use crate::util::Packet;
-#[cfg(feature = "advanced-arp")]
-use crate::util::{HardwareAddress, ProtocolAddress};
 #[cfg(not(feature = "advanced-arp"))]
 use {
     crate::util::MacAddress,
@@ -17,7 +15,9 @@ pub enum ArpOperation {
     #[cfg(feature = "advanced-arp")]
     InArpRequest,
     #[cfg(feature = "advanced-arp")]
-    InArpReply
+    InArpReply,
+    #[cfg(feature = "advanced-arp")]
+    Other(u16)
 }
 impl ArpOperation {
     pub fn from_value(value: u16) -> Self {
@@ -31,7 +31,7 @@ impl ArpOperation {
             #[cfg(feature = "advanced-arp")]
             9 => Self::InArpReply,
             #[cfg(feature = "advanced-arp")]
-            _ => panic!("Value can be only 1, 2, 3, 4, 8, 9!"),
+            _ => Self::Other(value),
             #[cfg(not(feature = "advanced-arp"))]
             _ => panic!("Value can be only 1, 2, 3, 4!")
         }
@@ -45,7 +45,9 @@ impl ArpOperation {
             #[cfg(feature = "advanced-arp")]
             Self::InArpRequest => 8,
             #[cfg(feature = "advanced-arp")]
-            Self::InArpReply => 9
+            Self::InArpReply => 9,
+            #[cfg(feature = "advanced-arp")]
+            Self::Other(value) => *value
         }
     }
 }
@@ -112,10 +114,10 @@ impl Packet for ArpPacket {
             packet.protocol_type = u16::from_be_bytes([bytes[2], bytes[3]]);
             packet.hardware_addr_len = bytes[4];
             packet.protocol_addr_len = bytes[5];
-            packet.sender_hardware_addr = bytes[8..8 + packet.hardware_addr_len].to_vec();
-            packet.sender_protocol_addr = bytes[8 + packet.hardware_addr_len..8 + packet.hardware_addr_len + packet.protocol_addr_len].to_vec();
-            packet.target_hardware_addr = bytes[8 + packet.hardware_addr_len + packet.protocol_addr_len..8 + 2 * packet.hardware_addr_len + packet.protocol_addr_len].to_vec();
-            packet.target_protocol_addr = bytes[8 + 2 * packet.hardware_addr_len + packet.protocol_addr_len..8 + 2 * packet.hardware_addr_len + 2 * packet.protocol_addr_len].to_vec();
+            packet.sender_hardware_addr = bytes[8..8 + packet.hardware_addr_len as usize].to_vec();
+            packet.sender_protocol_addr = bytes[8 + packet.hardware_addr_len as usize..(8 + packet.hardware_addr_len + packet.protocol_addr_len) as usize].to_vec();
+            packet.target_hardware_addr = bytes[(8 + packet.hardware_addr_len + packet.protocol_addr_len) as usize..(8 + 2 * packet.hardware_addr_len + packet.protocol_addr_len) as usize].to_vec();
+            packet.target_protocol_addr = bytes[(8 + 2 * packet.hardware_addr_len + packet.protocol_addr_len) as usize..(8 + 2 * packet.hardware_addr_len + 2 * packet.protocol_addr_len) as usize].to_vec();
         }
         #[cfg(not(feature = "advanced-arp"))]
         {
