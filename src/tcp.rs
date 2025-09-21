@@ -1,5 +1,5 @@
 use std::net::Ipv4Addr;
-use crate::util::checksum;
+use crate::util::{Packet, checksum};
 
 /// TCP Packet Option struct for `TcpPacket`
 /// TCP Option are consist of:
@@ -155,8 +155,38 @@ impl TcpPacket {
             payload: Vec::new()
         }
     }
+    /// Recalculates all fields
+    pub fn recalculate_all(&mut self, source_ip: Ipv4Addr, destination_ip: Ipv4Addr) -> () {
+        for option in self.options.iter_mut() {
+            option.recalculate_length();
+        }
+        self.recalculate_data_offset();
+        self.recalculate_checksum(source_ip, destination_ip);
+    }
+    /// Recalculates `data_offset` field in `TcpPacket`
+    pub fn recalculate_data_offset(&mut self) -> () {
+        let header = self.header_to_bytes().len();
+        self.data_offset = header as u8;
+    }
+    /// Recalculates `checksum` field in `TcpPacket`
+    /// Note that to calculate TCP Checksum you also need source ip and destination ip from IP packet
+    pub fn recalculate_checksum(&mut self, source_ip: Ipv4Addr, destination_ip: Ipv4Addr) -> () {
+        let mut packet = self.to_bytes();
+        let mut pseudo_header = Vec::<u8>::with_capacity(32);
+        pseudo_header.append(&mut source_ip.octets().to_vec());
+        pseudo_header.append(&mut destination_ip.octets().to_vec());
+        pseudo_header.push(0);
+        pseudo_header.push(6);
+        pseudo_header.append(&mut (packet.len() as u16).to_be_bytes().to_vec());
+        pseudo_header.append(&mut packet);
+        pseudo_header[28] = 0;
+        pseudo_header[29] = 0;
+        self.checksum = checksum(pseudo_header);
+    }
+}
+impl Packet for TcpPacket {
     /// Constructs `TcpPacket` from existing packet bytes
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
+    fn from_bytes(bytes: &[u8]) -> Self {
         if bytes.len() < 20 {
             panic!("Length of bytes is less than 20!");
         }
@@ -186,7 +216,7 @@ impl TcpPacket {
         packet
     }
     /// Converting **only header** of packet to bytes
-    pub fn header_to_bytes(&self) -> Vec<u8> {
+    fn header_to_bytes(&self) -> Vec<u8> {
         let mut packet = vec![0u8; 20];
         packet[0..=1].copy_from_slice(&self.source.to_be_bytes());
         packet[2..=3].copy_from_slice(&self.destination.to_be_bytes());
@@ -210,37 +240,9 @@ impl TcpPacket {
         packet
     }
     /// Converting **full** packet to bytes
-    pub fn to_bytes(&self) -> Vec<u8> {
+    fn to_bytes(&self) -> Vec<u8> {
         let mut packet = self.header_to_bytes();
         packet.append(&mut self.payload.clone());
         packet
-    }
-    /// Recalculates all fields
-    pub fn recalculate_all(&mut self, source_ip: Ipv4Addr, destination_ip: Ipv4Addr) -> () {
-        for option in self.options.iter_mut() {
-            option.recalculate_length();
-        }
-        self.recalculate_data_offset();
-        self.recalculate_checksum(source_ip, destination_ip);
-    }
-    /// Recalculates `data_offset` field in `TcpPacket`
-    pub fn recalculate_data_offset(&mut self) -> () {
-        let header = self.header_to_bytes().len();
-        self.data_offset = header as u8;
-    }
-    /// Recalculates `checksum` field in `TcpPacket`
-    /// Note that to calculate TCP Checksum you also need source ip and destination ip from IP packet
-    pub fn recalculate_checksum(&mut self, source_ip: Ipv4Addr, destination_ip: Ipv4Addr) -> () {
-        let mut packet = self.to_bytes();
-        let mut pseudo_header = Vec::<u8>::with_capacity(32);
-        pseudo_header.append(&mut source_ip.octets().to_vec());
-        pseudo_header.append(&mut destination_ip.octets().to_vec());
-        pseudo_header.push(0);
-        pseudo_header.push(6);
-        pseudo_header.append(&mut (packet.len() as u16).to_be_bytes().to_vec());
-        pseudo_header.append(&mut packet);
-        pseudo_header[28] = 0;
-        pseudo_header[29] = 0;
-        self.checksum = checksum(pseudo_header);
     }
 }

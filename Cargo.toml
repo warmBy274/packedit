@@ -1,8 +1,16 @@
 [package]
 name = "packedit"
-version = "1.0.5"
+version = "1.0.9"
 edition = "2024"
 description = "Raw packet edit crate on pure rust"
 license = "MIT"
 
+[features]
+default = []
+legacy-arp = []
+legacy = [
+    "legacy-arp"
+]
+
 [dependencies]
+paste = "1.0.15"

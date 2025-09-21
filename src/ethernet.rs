@@ -1,33 +1,4 @@
-/// Media Access Control Address
-/// Contains 6 bytes
-#[derive(Debug, Clone)]
-pub struct MacAddress {
-    /// Mac Address Data Bytes
-    pub bytes: [u8; 6]
-}
-impl MacAddress {
-    /// Constructs an zero `MacAddress`
-    pub fn new() -> Self {
-        Self {
-            bytes: [0, 0, 0, 0, 0, 0]
-        }
-    }
-    /// Constructs `MacAddress` from byte slice
-    pub fn from_slice(bytes: &[u8]) -> Self {
-        if bytes.len() < 6 {
-            panic!("Bytes len must be 6!");
-        }
-        Self {
-            bytes: [bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5]]
-        }
-    }
-    /// Constructs `MacAddress` from byte array
-    pub fn from_bytes(bytes: [u8; 6]) -> Self {
-        Self {
-            bytes: bytes
-        }
-    }
-}
+use crate::util::{MacAddress, Packet};
 
 /// Struct for oridinary Ethernet Frame
 /// You can construct it from scratch with `EthernetPacket::new()` and consistently editing
@@ -49,8 +20,10 @@ impl EthernetPacket {
             payload: Vec::new()
         }
     }
+}
+impl Packet for EthernetPacket {
     /// Constructs `EthernetPacket` from existing ethernet frame bytes
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
+    fn from_bytes(bytes: &[u8]) -> Self {
         if bytes.len() < 15 {
             panic!("Bytes len must be at least 15!");
         }
@@ -60,5 +33,17 @@ impl EthernetPacket {
             protocol: u16::from_be_bytes([bytes[12], bytes[13]]),
             payload: bytes[14..].to_vec()
         }
+    }
+    fn header_to_bytes(&self) -> Vec<u8> {
+        let mut packet = vec![0u8; 14];
+        packet[0..=5].copy_from_slice(&self.destination.to_bytes());
+        packet[6..=11].copy_from_slice(&self.source.to_bytes());
+        packet[12..=13].copy_from_slice(&self.protocol.to_be_bytes());
+        packet
+    }
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut packet = self.header_to_bytes();
+        packet.append(&mut self.payload.clone());
+        packet
     }
 }

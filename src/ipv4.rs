@@ -1,6 +1,6 @@
 use std::net::Ipv4Addr;
 use crate::{
-    util::checksum,
+    util::{Packet, checksum},
     tcp::TcpPacket,
     udp::UdpPacket
 };
@@ -175,8 +175,37 @@ impl Ipv4Packet {
             payload: Vec::new()
         }
     }
+    /// Recalculates all fields
+    pub fn recalculate_all(&mut self) -> () {
+        for option in self.options.iter_mut() {
+            option.recalculate_length();
+        }
+        self.recalculate_lengths();
+        self.recalculate_checksum();
+    }
+    /// Recalculates `header_len` and `total_len` fields in `Ipv4Packet`
+    pub fn recalculate_lengths(&mut self) -> () {
+        let header = self.header_to_bytes().len();
+        self.header_len = header as u8;
+        self.total_len = header as u16 + self.payload.len() as u16;
+    }
+    /// Recalculates `checksum` field in `Ipv4Packet`
+    /// Note that this checksum affects only header, payload remains untouched
+    pub fn recalculate_checksum(&mut self) -> () {
+        self.checksum = checksum(self.header_to_bytes());
+    }
+    /// Gives a next level packet, i.e. if protocol is TCP -> gives TcpPacket, if protocol is UDP -> gives UdpPacket, etc.
+    pub fn get_next_level_packet(&self) -> Ipv4NextLevelPacket {
+        match self.protocol {
+            6 => Ipv4NextLevelPacket::Tcp(TcpPacket::from_bytes(self.payload.clone().as_slice())),
+            17 => Ipv4NextLevelPacket::Udp(UdpPacket::from_bytes(self.payload.clone().as_slice())),
+            _ => Ipv4NextLevelPacket::Unimplemented(self.payload.clone())
+        }
+    }
+}
+impl Packet for Ipv4Packet {
     /// Constructs `Ipv4Packet` from existing packet bytes
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
+    fn from_bytes(bytes: &[u8]) -> Self {
         if (bytes[0] >> 4) != 4 {
             panic!("Its not an Ipv4 packet!");
         }
@@ -212,7 +241,7 @@ impl Ipv4Packet {
         packet
     }
     /// Converting **only header** of packet to bytes
-    pub fn header_to_bytes(&self) -> Vec<u8> {
+    fn header_to_bytes(&self) -> Vec<u8> {
         let mut packet = vec![0u8; 20];
         packet[0] = 4 << 4;
         packet[0] |= (self.header_len / 4) & 0xF;
@@ -240,36 +269,9 @@ impl Ipv4Packet {
         packet
     }
     /// Converting **full** packet to bytes
-    pub fn to_bytes(&self) -> Vec<u8> {
+    fn to_bytes(&self) -> Vec<u8> {
         let mut packet = self.header_to_bytes();
         packet.append(&mut self.payload.clone());
         packet
-    }
-    /// Recalculates all fields
-    pub fn recalculate_all(&mut self) -> () {
-        for option in self.options.iter_mut() {
-            option.recalculate_length();
-        }
-        self.recalculate_lengths();
-        self.recalculate_checksum();
-    }
-    /// Recalculates `header_len` and `total_len` fields in `Ipv4Packet`
-    pub fn recalculate_lengths(&mut self) -> () {
-        let header = self.header_to_bytes().len();
-        self.header_len = header as u8;
-        self.total_len = header as u16 + self.payload.len() as u16;
-    }
-    /// Recalculates `checksum` field in `Ipv4Packet`
-    /// Note that this checksum affects only header, payload remains untouched
-    pub fn recalculate_checksum(&mut self) -> () {
-        self.checksum = checksum(self.header_to_bytes());
-    }
-    /// Gives a next level packet, i.e. if protocol is TCP -> gives TcpPacket, if protocol is UDP -> gives UdpPacket, etc.
-    pub fn get_next_level_packet(&self) -> Ipv4NextLevelPacket {
-        match self.protocol {
-            6 => Ipv4NextLevelPacket::Tcp(TcpPacket::from_bytes(self.payload.clone())),
-            17 => Ipv4NextLevelPacket::Udp(UdpPacket::from_bytes(self.payload.clone())),
-            _ => Ipv4NextLevelPacket::Unimplemented(self.payload.clone())
-        }
     }
 }

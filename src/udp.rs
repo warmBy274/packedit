@@ -1,5 +1,5 @@
 use std::net::Ipv4Addr;
-use crate::util::checksum;
+use crate::util::{Packet, checksum};
 
 /// Struct for ordinary TCP Packet
 /// You can construct it from scratch with `UdpPacket::new()` and consistently editing
@@ -30,31 +30,6 @@ impl UdpPacket {
             payload: Vec::new()
         }
     }
-    /// Constructs `UdpPacket` from existing packet bytes
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self {
-            source: u16::from_be_bytes([bytes[0], bytes[1]]),
-            destination: u16::from_be_bytes([bytes[2], bytes[3]]),
-            length: u16::from_be_bytes([bytes[4], bytes[5]]),
-            checksum: u16::from_be_bytes([bytes[6], bytes[7]]),
-            payload: bytes[8..].to_vec()
-        }
-    }
-    /// Converting **only header** of packet to bytes
-    pub fn header_to_bytes(&self) -> Vec<u8> {
-        [
-            self.source.to_be_bytes(),
-            self.destination.to_be_bytes(),
-            self.length.to_be_bytes(),
-            self.checksum.to_be_bytes()
-        ].concat()
-    }
-    /// Converting **full** packet to bytes
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let mut packet = self.header_to_bytes();
-        packet.append(&mut self.payload.clone());
-        packet
-    }
     /// Recalculates all fields
     pub fn recalculate_all(&mut self, source_ip: Ipv4Addr, destination_ip: Ipv4Addr) -> () {
         self.recalculate_length();
@@ -78,5 +53,32 @@ impl UdpPacket {
         pseudo_header[18] = 0;
         pseudo_header[19] = 0;
         self.checksum = checksum(pseudo_header);
+    }
+}
+impl Packet for UdpPacket {
+    /// Constructs `UdpPacket` from existing packet bytes
+    fn from_bytes(bytes: &[u8]) -> Self {
+        Self {
+            source: u16::from_be_bytes([bytes[0], bytes[1]]),
+            destination: u16::from_be_bytes([bytes[2], bytes[3]]),
+            length: u16::from_be_bytes([bytes[4], bytes[5]]),
+            checksum: u16::from_be_bytes([bytes[6], bytes[7]]),
+            payload: bytes[8..].to_vec()
+        }
+    }
+    /// Converting **only header** of packet to bytes
+    fn header_to_bytes(&self) -> Vec<u8> {
+        [
+            self.source.to_be_bytes(),
+            self.destination.to_be_bytes(),
+            self.length.to_be_bytes(),
+            self.checksum.to_be_bytes()
+        ].concat()
+    }
+    /// Converting **full** packet to bytes
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut packet = self.header_to_bytes();
+        packet.append(&mut self.payload.clone());
+        packet
     }
 }
