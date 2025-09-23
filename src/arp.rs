@@ -68,6 +68,7 @@ pub struct ArpPacket {
 }
 /// Normal ARP Packet, containing sender and target MAC and IP Addresses, with `hardware_addr_len = 6`, `protocol_addr_len = 4`, `hardware_type = 1` and `protocol_type = 0x0800(2048)`
 #[cfg(not(feature = "advanced-arp"))]
+#[derive(Debug, Clone)]
 pub struct ArpPacket {
     pub operation: ArpOperation,
     pub sender_mac: MacAddress,

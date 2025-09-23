@@ -1,6 +1,7 @@
 pub use crate::ethernet;
 pub use crate::arp::*;
 pub use crate::ipv4::*;
+pub use crate::ipv6::*;
 pub use crate::tcp::*;
 pub use crate::udp::*;
 pub use crate::util::*;

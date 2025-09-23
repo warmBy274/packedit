@@ -4,8 +4,10 @@ use crate::{
     tcp::TcpPacket,
     udp::UdpPacket
 };
+pub use crate::util::{DscpType, EcnType};
 
 /// Next Level Packet from IPv4 Packet payload
+#[derive(Debug, Clone)]
 pub enum Ipv4NextLevelPacket {
     Tcp(TcpPacket),
     Udp(UdpPacket),
@@ -122,8 +124,10 @@ impl Ipv4Option {
 pub struct Ipv4Packet {
     /// Ipv4 Header length of packet in bytes
     pub header_len: u8,
-    /// Type of Service
-    pub tos: u8,
+    /// Differentiated Services Code Point
+    pub dscp: DscpType,
+    /// Explicit Congestion Notification
+    pub ecn: EcnType,
     /// Total length of packet in bytes
     pub total_len: u16,
     /// Packet identification number
@@ -160,7 +164,8 @@ impl Ipv4Packet {
     pub fn new() -> Self {
         Self {
             header_len: 0,
-            tos: 0,
+            dscp: DscpType::CS0,
+            ecn: EcnType::NotSupport,
             total_len: 0,
             id: 0,
             dont_fragment: false,
@@ -212,9 +217,10 @@ impl Packet for Ipv4Packet {
         if bytes.len() < 20 {
             panic!("Length of bytes is less than 20!");
         }
-        let mut packet: Self = Self::new();
+        let mut packet = Self::new();
         packet.header_len = (bytes[0] & 0xF) * 4;
-        packet.tos = bytes[1];
+        packet.dscp = DscpType::from_bits(bytes[1] >> 2);
+        packet.ecn = EcnType::from_bits(bytes[1] & 0b11);
         packet.total_len = u16::from_be_bytes([bytes[2], bytes[3]]);
         packet.id = u16::from_be_bytes([bytes[4], bytes[5]]);
         packet.dont_fragment = (bytes[6] & 64) != 0;
@@ -245,7 +251,8 @@ impl Packet for Ipv4Packet {
         let mut packet = vec![0u8; 20];
         packet[0] = 4 << 4;
         packet[0] |= (self.header_len / 4) & 0xF;
-        packet[1] = self.tos;
+        packet[1] = self.ecn.to_bits();
+        packet[1] |= self.dscp.to_bits() << 2;
         packet[2..=3].copy_from_slice(&self.total_len.to_be_bytes());
         packet[4..=5].copy_from_slice(&self.id.to_be_bytes());
         packet[6] = (self.dont_fragment as u8) << 6;

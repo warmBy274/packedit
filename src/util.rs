@@ -1,3 +1,81 @@
+#[derive(Debug, Clone, Copy)]
+pub enum DscpType {
+    /// Normal traffic
+    CS0,
+    /// Low priority
+    CS1,
+    /// Network control: SNMP, SSH, SCP, RDP, etc.
+    CS2,
+    /// Audiostreaming
+    CS3,
+    /// Videostreaming
+    CS4,
+    /// Connection control messages: SIP, H.323, etc.
+    CS5,
+    /// Network control high priority
+    CS6,
+    /// Network management: ICPM, OSPF, IGMP, etc.
+    CS7,
+    /// VoIP, low latency
+    EF
+}
+impl DscpType {
+    pub fn from_bits(value: u8) -> Self {
+        match value {
+            0 => Self::CS0,
+            8 => Self::CS1,
+            16 => Self::CS2,
+            24 => Self::CS3,
+            32 => Self::CS4,
+            40 => Self::CS5,
+            48 => Self::CS6,
+            56 => Self::CS7,
+            46 => Self::EF,
+            _ => panic!("DSCP value can be only 0, 8, 16, 24, 32, 40, 46, 48, 56!")
+        }
+    }
+    pub fn to_bits(&self) -> u8 {
+        match self {
+            Self::CS0 => 0,
+            Self::CS1 => 8,
+            Self::CS2 => 16,
+            Self::CS3 => 24,
+            Self::CS4 => 32,
+            Self::CS5 => 40,
+            Self::CS6 => 48,
+            Self::CS7 => 56,
+            Self::EF => 46
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum EcnType {
+    NotSupport,
+    ECT0,
+    ECT1,
+    CE
+}
+impl EcnType {
+    pub fn from_bits(value: u8) -> Self {
+        match value {
+            0b00 => Self::NotSupport,
+            0b01 => Self::ECT1,
+            0b10 => Self::ECT0,
+            0b11 => Self::CE,
+            _ => panic!("ECN value must be less than 4!")
+        }
+    }
+    pub fn to_bits(&self) -> u8 {
+        match self {
+            Self::NotSupport => 0b00,
+            Self::ECT1 => 0b01,
+            Self::ECT0 => 0b10,
+            Self::CE => 0b11
+        }
+    }
+}
+
 /// Media Access Control address\nUsed in Ethernet, Experimental Ethernet, Token Ring, FDDI and other
 #[derive(Debug, Clone, Copy)]
 pub struct MacAddress {
