@@ -165,7 +165,7 @@ impl Ipv4Packet {
         Self {
             header_len: 0,
             dscp: DscpType::CS0,
-            ecn: EcnType::NotSupport,
+            ecn: EcnType::NotECT,
             total_len: 0,
             id: 0,
             dont_fragment: false,

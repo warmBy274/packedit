@@ -51,7 +51,7 @@ impl DscpType {
 
 #[derive(Debug, Clone, Copy)]
 pub enum EcnType {
-    NotSupport,
+    NotECT,
     ECT0,
     ECT1,
     CE
@@ -59,7 +59,7 @@ pub enum EcnType {
 impl EcnType {
     pub fn from_bits(value: u8) -> Self {
         match value {
-            0b00 => Self::NotSupport,
+            0b00 => Self::NotECT,
             0b01 => Self::ECT1,
             0b10 => Self::ECT0,
             0b11 => Self::CE,
@@ -68,7 +68,7 @@ impl EcnType {
     }
     pub fn to_bits(&self) -> u8 {
         match self {
-            Self::NotSupport => 0b00,
+            Self::NotECT => 0b00,
             Self::ECT1 => 0b01,
             Self::ECT0 => 0b10,
             Self::CE => 0b11

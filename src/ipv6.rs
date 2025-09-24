@@ -6,11 +6,19 @@ use crate::{
 };
 pub use crate::util::{DscpType, EcnType};
 
+/// Next Level Packet from IPv6 Packet payload
+#[derive(Debug, Clone)]
+pub enum Ipv6NextLevelPacket {
+    Tcp(TcpPacket),
+    Udp(UdpPacket),
+    Unimplemented(Vec<u8>)
+}
+
 #[derive(Debug, Clone)]
 pub enum Ipv6ExtensionHeader {
     HopByHopOptions {
         next_header: u8,
-        options: Vec<u8>
+        options: Vec<Ipv6Option>
     },
     Routing {
         next_header: u8,
@@ -22,7 +30,7 @@ pub enum Ipv6ExtensionHeader {
     },
     DestinationOptions {
         next_header: u8,
-        options: Vec<u8>
+        options: Vec<Ipv6Option>
     },
     Mobility {
         next_header: u8,
@@ -36,16 +44,22 @@ impl Ipv6ExtensionHeader {
         match self {
             Self::HopByHopOptions {next_header, options} => {
                 header.push(*next_header);
-                header.push(((options.len() + 2) / 8 - 1) as u8);
-                header.append(&mut options.clone());
-                let padding = 8 - header.len() % 8;
-                if padding == 1 {
-                    header.push(0);
+                let mut option_bytes = Vec::new();
+                for option in options.iter() {
+                    option_bytes.append(&mut option.to_bytes());
                 }
-                else if padding > 1 {
-                    header.push(1);
-                    header.push((padding - 2) as u8);
-                    header.append(&mut vec![0u8; padding - 2]);
+                header.push(((option_bytes.len() + 2) / 8 - 1) as u8);
+                header.append(&mut option_bytes);
+                let padding = header.len() % 8;
+                if padding != 0 {
+                    if 8 - padding == 1 {
+                        header.push(0);
+                    }
+                    else {
+                        header.push(1);
+                        header.push((8 - padding - 2) as u8);
+                        header.append(&mut vec![0u8; 8 - padding - 2]);
+                    }
                 }
             }
             Self::Routing {next_header, payload} => {
@@ -59,16 +73,22 @@ impl Ipv6ExtensionHeader {
             }
             Self::DestinationOptions {next_header, options} => {
                 header.push(*next_header);
-                header.push(((options.len() + 2) / 8 - 1) as u8);
-                header.append(&mut options.clone());
-                let padding = 8 - header.len() % 8;
-                if padding == 1 {
-                    header.push(0);
+                let mut option_bytes = Vec::new();
+                for option in options.iter() {
+                    option_bytes.append(&mut option.to_bytes());
                 }
-                else if padding > 1 {
-                    header.push(1);
-                    header.push((padding - 2) as u8);
-                    header.append(&mut vec![0u8; padding - 2]);
+                header.push(((option_bytes.len() + 2) / 8 - 1) as u8);
+                header.append(&mut option_bytes);
+                let padding = 8 - header.len() % 8;
+                if padding != 0 {
+                    if 8 - padding == 1 {
+                        header.push(0);
+                    }
+                    else {
+                        header.push(1);
+                        header.push((8 - padding - 2) as u8);
+                        header.append(&mut vec![0u8; 8 - padding - 2]);
+                    }
                 }
             }
             Self::Mobility {next_header, payload} => {
@@ -87,6 +107,35 @@ impl Ipv6ExtensionHeader {
             Self::Fragment {next_header: _, payload: _} => 44,
             Self::DestinationOptions {next_header: _, options: _} => 60,
             Self::Mobility {next_header: _, payload: _} => 135
+        }
+    }
+    pub fn get_next_header_type(&self) -> u8 {
+        match self {
+            Self::HopByHopOptions {next_header, options: _} => *next_header,
+            Self::Routing {next_header, payload: _} => *next_header,
+            Self::Fragment {next_header, payload: _} => *next_header,
+            Self::DestinationOptions {next_header, options: _} => *next_header,
+            Self::Mobility {next_header, payload: _} => *next_header
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Ipv6Option {
+    pub kind: u8,
+    pub data: Vec<u8>
+}
+impl Ipv6Option {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        if self.kind == 0 {
+            vec![0]
+        }
+        else {
+            let mut option: Vec<u8> = vec![];
+            option.push(self.kind);
+            option.push(self.data.len() as u8);
+            option.append(&mut self.data.clone());
+            option
         }
     }
 }
@@ -111,7 +160,7 @@ impl Ipv6Packet {
     pub fn new() -> Self {
         Self {
             dscp: DscpType::CS0,
-            ecn: EcnType::NotSupport,
+            ecn: EcnType::NotECT,
             flow_label: 0,
             payload_len: 0,
             next_header: 0,
@@ -135,6 +184,20 @@ impl Ipv6Packet {
     pub fn recalculate_all(&mut self) -> () {
         self.recalculate_length();
         self.recalculate_next_header();
+    }
+    pub fn get_next_level_packet(&self) -> Ipv6NextLevelPacket {
+        let protocol;
+        if self.extension_headers.is_empty() {
+            protocol = self.next_header;
+        }
+        else {
+            protocol = self.extension_headers.last().unwrap().get_next_header_type();
+        }
+        match protocol {
+            6 => Ipv6NextLevelPacket::Tcp(TcpPacket::from_bytes(self.payload.clone().as_slice())),
+            17 => Ipv6NextLevelPacket::Udp(UdpPacket::from_bytes(self.payload.clone().as_slice())),
+            _ => Ipv6NextLevelPacket::Unimplemented(self.payload.clone())
+        }
     }
 }
 impl Packet for Ipv6Packet {
@@ -163,22 +226,41 @@ impl Packet for Ipv6Packet {
         loop {
             match next_header {
                 0 => {
-                    let length = (bytes[i + 1] as u16 + 1) * 8;
+                    let length = (bytes[i + 1] as usize + 1) * 8 - 2;
+                    let data = &bytes[i + 2..i + 2 + length];
+                    let mut options: Vec<Ipv6Option> = Vec::new();
+                    let mut j = 0usize;
+                    while j < length {
+                        if data[j] == 0 {
+                            options.push(Ipv6Option {
+                                kind: 0,
+                                data: Vec::new()
+                            });
+                            j += 1;
+                        }
+                        else {
+                            options.push(Ipv6Option {
+                                kind: data[j],
+                                data: data[j + 2..j + 2 + data[j + 1] as usize].to_vec()
+                            });
+                            j += 2 + data[j + 1] as usize;
+                        }
+                    }
                     packet.extension_headers.push(Ipv6ExtensionHeader::HopByHopOptions {
                         next_header: bytes[i],
-                        options: bytes[i + 2..i + length as usize].to_vec()
+                        options: options
                     });
                     next_header = bytes[i];
-                    i += length as usize;
+                    i += length + 2;
                 }
                 43 => {
-                    let length = (bytes[i + 1] as u16 + 1) * 8;
+                    let length = (bytes[i + 1] as usize + 1) * 8;
                     packet.extension_headers.push(Ipv6ExtensionHeader::Routing {
                         next_header: bytes[i],
-                        payload: bytes[i + 2..i + length as usize].to_vec()
+                        payload: bytes[i + 2..i + length].to_vec()
                     });
                     next_header = bytes[i];
-                    i += length as usize;
+                    i += length;
                 }
                 44 => {
                     packet.extension_headers.push(Ipv6ExtensionHeader::Fragment {
@@ -189,13 +271,32 @@ impl Packet for Ipv6Packet {
                     i += 8;
                 }
                 60 => {
-                    let length = (bytes[i + 1] as u16 + 1) * 8;
+                    let length = (bytes[i + 1] as usize + 1) * 8 - 2;
+                    let data = &bytes[i + 2..i + 2 + length];
+                    let mut  options: Vec<Ipv6Option> = Vec::new();
+                    let mut j = 0usize;
+                    while j < length {
+                        if data[j] == 0 {
+                            options.push(Ipv6Option {
+                                kind: 0,
+                                data: Vec::new()
+                            });
+                            j += 1;
+                        }
+                        else {
+                            options.push(Ipv6Option {
+                                kind: data[j],
+                                data: data[j + 2..j + 2 + data[j + 1] as usize].to_vec()
+                            });
+                            j += 2 + data[j + 1] as usize;
+                        }
+                    }
                     packet.extension_headers.push(Ipv6ExtensionHeader::DestinationOptions {
                         next_header: bytes[i],
-                        options: bytes[i + 2..i + length as usize].to_vec()
+                        options: options
                     });
                     next_header = bytes[i];
-                    i += length as usize;
+                    i += length + 2;
                 }
                 135 => {
                     let length = (bytes[i + 1] as u16 + 1) * 8;
