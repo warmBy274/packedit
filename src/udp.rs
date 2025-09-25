@@ -1,4 +1,4 @@
-use std::net::Ipv4Addr;
+use std::net::IpAddr;
 use crate::util::{Packet, checksum};
 
 /// Struct for ordinary TCP Packet
@@ -31,7 +31,7 @@ impl UdpPacket {
         }
     }
     /// Recalculates all fields
-    pub fn recalculate_all(&mut self, source_ip: Ipv4Addr, destination_ip: Ipv4Addr) -> () {
+    pub fn recalculate_all(&mut self, source_ip: IpAddr, destination_ip: IpAddr) -> () {
         self.recalculate_length();
         self.recalculate_checksum(source_ip, destination_ip);
     }
@@ -41,18 +41,33 @@ impl UdpPacket {
     }
     /// Recalculates `checksum` field in `TcpPacket`
     /// Note that to calculate TCP Checksum you also need source ip and destination ip from IP packet
-    pub fn recalculate_checksum(&mut self, source_ip: Ipv4Addr, destination_ip: Ipv4Addr) -> () {
+    pub fn recalculate_checksum(&mut self, source_ip: IpAddr, destination_ip: IpAddr) -> () {
         let mut packet = self.to_bytes();
-        let mut pseudo_header = Vec::<u8>::with_capacity(32);
-        pseudo_header.append(&mut source_ip.octets().to_vec());
-        pseudo_header.append(&mut destination_ip.octets().to_vec());
-        pseudo_header.push(0);
-        pseudo_header.push(17);
-        pseudo_header.append(&mut (packet.len() as u16).to_be_bytes().to_vec());
-        pseudo_header.append(&mut packet);
-        pseudo_header[18] = 0;
-        pseudo_header[19] = 0;
-        self.checksum = checksum(pseudo_header);
+        packet[6] = 0;
+        packet[7] = 0;
+        match (source_ip, destination_ip) {
+            (IpAddr::V4(source), IpAddr::V4(destination)) => {
+                let mut pseudo_header = Vec::<u8>::with_capacity(8 + packet.len());
+                pseudo_header.append(&mut source.octets().to_vec());
+                pseudo_header.append(&mut destination.octets().to_vec());
+                pseudo_header.push(0);
+                pseudo_header.push(17);
+                pseudo_header.append(&mut (packet.len() as u16).to_be_bytes().to_vec());
+                pseudo_header.append(&mut packet);
+                self.checksum = checksum(pseudo_header);
+            }
+            (IpAddr::V6(source), IpAddr::V6(destination)) => {
+                let mut pseudo_header = Vec::<u8>::with_capacity(48 + packet.len());
+                pseudo_header.append(&mut source.octets().to_vec());
+                pseudo_header.append(&mut destination.octets().to_vec());
+                pseudo_header.append(&mut (packet.len() as u32).to_be_bytes().to_vec());
+                pseudo_header.append(&mut vec![0; 3]);
+                pseudo_header.push(17);
+                pseudo_header.append(&mut packet);
+                self.checksum = checksum(pseudo_header);
+            }
+            _ => panic!("'source_ip' and 'destination_ip' must have same type!")
+        }
     }
 }
 impl Packet for UdpPacket {

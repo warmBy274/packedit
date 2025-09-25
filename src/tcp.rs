@@ -1,4 +1,4 @@
-use std::net::Ipv4Addr;
+use std::net::IpAddr;
 use crate::util::{Packet, checksum};
 
 /// TCP Packet Option struct for `TcpPacket`
@@ -10,8 +10,6 @@ use crate::util::{Packet, checksum};
 pub struct TcpOption {
     /// TCP Option *'type'*
     pub kind: u8,
-    /// TCP Option total length in bytes
-    pub length: u8,
     /// TCP Option data
     pub data: Vec<u8>
 }
@@ -20,7 +18,6 @@ impl TcpOption {
     pub fn new() -> Self {
         Self {
             kind: 0,
-            length: 0,
             data: Vec::new()
         }
     }
@@ -30,21 +27,16 @@ impl TcpOption {
     pub fn from_bytes(bytes: Vec<u8>) -> Self {
         Self {
             kind: bytes[0],
-            length: bytes[1],
             data: bytes[2..].to_vec()
         }
     }
     /// Converts option to bytes without padding
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut option = vec![0u8; 2];
-        option[0] = self.kind;
-        option[1] = self.length;
+        let mut option = Vec::with_capacity(self.data.len() + 2);
+        option.push(self.kind);
+        option.push(self.data.len() as u8 + 2);
         option.append(&mut self.data.clone());
         option
-    }
-    /// Recalculates `length` field of option base on data len
-    pub fn recalculate_length(&mut self) -> () {
-        self.length = self.data.len() as u8 + 2;
     }
 }
 
@@ -156,10 +148,7 @@ impl TcpPacket {
         }
     }
     /// Recalculates all fields
-    pub fn recalculate_all(&mut self, source_ip: Ipv4Addr, destination_ip: Ipv4Addr) -> () {
-        for option in self.options.iter_mut() {
-            option.recalculate_length();
-        }
+    pub fn recalculate_all(&mut self, source_ip: IpAddr, destination_ip: IpAddr) -> () {
         self.recalculate_data_offset();
         self.recalculate_checksum(source_ip, destination_ip);
     }
@@ -170,18 +159,33 @@ impl TcpPacket {
     }
     /// Recalculates `checksum` field in `TcpPacket`
     /// Note that to calculate TCP Checksum you also need source ip and destination ip from IP packet
-    pub fn recalculate_checksum(&mut self, source_ip: Ipv4Addr, destination_ip: Ipv4Addr) -> () {
+    pub fn recalculate_checksum(&mut self, source_ip: IpAddr, destination_ip: IpAddr) -> () {
         let mut packet = self.to_bytes();
-        let mut pseudo_header = Vec::<u8>::with_capacity(32);
-        pseudo_header.append(&mut source_ip.octets().to_vec());
-        pseudo_header.append(&mut destination_ip.octets().to_vec());
-        pseudo_header.push(0);
-        pseudo_header.push(6);
-        pseudo_header.append(&mut (packet.len() as u16).to_be_bytes().to_vec());
-        pseudo_header.append(&mut packet);
-        pseudo_header[28] = 0;
-        pseudo_header[29] = 0;
-        self.checksum = checksum(pseudo_header);
+        packet[16] = 0;
+        packet[17] = 0;
+        match (source_ip, destination_ip) {
+            (IpAddr::V4(source), IpAddr::V4(destination)) => {
+                let mut pseudo_header = Vec::<u8>::with_capacity(32 + packet.len());
+                pseudo_header.append(&mut source.octets().to_vec());
+                pseudo_header.append(&mut destination.octets().to_vec());
+                pseudo_header.push(0);
+                pseudo_header.push(6);
+                pseudo_header.append(&mut (packet.len() as u16).to_be_bytes().to_vec());
+                pseudo_header.append(&mut packet);
+                self.checksum = checksum(pseudo_header);
+            }
+            (IpAddr::V6(source), IpAddr::V6(destination)) => {
+                let mut pseudo_header = Vec::<u8>::with_capacity(60 + packet.len());
+                pseudo_header.append(&mut source.octets().to_vec());
+                pseudo_header.append(&mut destination.octets().to_vec());
+                pseudo_header.append(&mut (packet.len() as u32).to_be_bytes().to_vec());
+                pseudo_header.append(&mut vec![0; 3]);
+                pseudo_header.push(6);
+                pseudo_header.append(&mut packet);
+                self.checksum = checksum(pseudo_header);
+            }
+            _ => panic!("'source_ip' and 'destination_ip' must have same type!")
+        }
     }
 }
 impl Packet for TcpPacket {
