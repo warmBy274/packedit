@@ -1,8 +1,4 @@
-pub mod ethernet;
-pub mod arp;
-pub mod ipv4;
-pub mod ipv6;
-pub mod tcp;
-pub mod udp;
+pub mod l2;
+pub mod l3;
+pub mod l4;
 pub mod util;
-pub mod prelude;
